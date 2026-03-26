@@ -1,0 +1,12 @@
+﻿src/App.tsx(138,43): error TS2322: Type '{ children: any[]; location: Location<any>; key: string; }' is not assignable to type 'RoutesProps'.
+  Property 'key' does not exist on type 'RoutesProps'.
+supabase/functions/ai-anomaly-detector/index.ts(1,23): error TS2307: Cannot find module 'https://deno.land/std@0.168.0/http/server.ts' or its corresponding type declarations.
+supabase/functions/ai-anomaly-detector/index.ts(2,30): error TS2307: Cannot find module 'https://esm.sh/@supabase/supabase-js@2' or its corresponding type declarations.
+supabase/functions/ai-anomaly-detector/index.ts(20,21): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-anomaly-detector/index.ts(57,7): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-anomaly-detector/index.ts(58,7): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-detector/index.ts(2,36): error TS2307: Cannot find module 'npm:@google/generative-ai' or its corresponding type declarations.
+supabase/functions/ai-detector/index.ts(4,38): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-detector/index.ts(6,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/vt-checker/index.ts(3,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/vt-checker/index.ts(5,22): error TS2304: Cannot find name 'Deno'.
