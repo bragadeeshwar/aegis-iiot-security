@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { HashRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
@@ -89,14 +89,18 @@ const AppContent = () => {
     setIsSidebarOpen(false);
   }, [location.pathname]);
 
-  // Handle Redirection
+  // Handle Redirection - Hardened
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && !isAuthPage) {
-      navigate("/login");
-    } else if (!isLoading && isAuthenticated && isAuthPage) {
-      navigate("/");
+    if (isLoading) return;
+    
+    const isAtAuth = location.pathname.includes("/login") || location.pathname.includes("/register");
+    
+    if (!isAuthenticated && !isAtAuth) {
+      navigate("/login", { replace: true });
+    } else if (isAuthenticated && isAtAuth) {
+      navigate("/", { replace: true });
     }
-  }, [isAuthenticated, isLoading, isAuthPage, navigate]);
+  }, [isAuthenticated, isLoading, location.pathname]);
 
   if (isLoading) {
     return (
