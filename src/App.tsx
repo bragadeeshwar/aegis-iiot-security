@@ -84,6 +84,9 @@ const AppContent = () => {
   const navigate = useNavigate();
   const isAuthPage = location.pathname === "/login" || location.pathname === "/register";
 
+  // DIAGNOSTIC MASK
+  console.log("Aegis AppContent Rendering... isLoading:", isLoading);
+
   // Close sidebar on route change on mobile
   useEffect(() => {
     setIsSidebarOpen(false);
