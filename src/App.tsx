@@ -84,9 +84,6 @@ const AppContent = () => {
   const navigate = useNavigate();
   const isAuthPage = location.pathname === "/login" || location.pathname === "/register";
 
-  // DIAGNOSTIC MASK
-  console.log("Aegis AppContent Rendering... isLoading:", isLoading);
-
   // Close sidebar on route change on mobile
   useEffect(() => {
     setIsSidebarOpen(false);
@@ -238,24 +235,11 @@ const AppContent = () => {
 };
 
 export default function App() {
-  console.log("Aegis Critical Mount Check...");
   return (
-    <div style={{
-      height: '100vh', 
-      width: '100vw', 
-      background: 'red', 
-      color: 'white', 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center',
-      fontSize: '40px',
-      fontWeight: 'bold',
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      zIndex: 99999
-    }}>
-      🛡️ AEGIS EMERGENCY MODE: IF YOU SEE THIS, REACT IS WORKING.
-    </div>
+    <Router>
+      <ErrorBoundary>
+        <AppContent />
+      </ErrorBoundary>
+    </Router>
   );
 }
