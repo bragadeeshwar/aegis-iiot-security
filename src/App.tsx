@@ -1,85 +1,157 @@
-import React, { useState, useEffect } from "react";
-import { HashRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { Shield, Activity, Cpu, ShieldAlert, ShieldCheck, Zap, Menu, LogOut, Terminal as TerminalIcon } from "lucide-react";
+import { useState, useEffect } from "react";
+import { HashRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "motion/react";
+import Sidebar from "./components/Sidebar";
+import Header from "./components/Header";
+import Dashboard from "./components/Dashboard";
+import DeviceManagement from "./components/DeviceManagement";
+import NetworkVisualization from "./components/NetworkVisualization";
+import ThreatCenter from "./components/ThreatCenter";
+import AttackSimulation from "./components/AttackSimulation";
+import ZeroTrust from "./components/ZeroTrust";
+import AICopilot from "./components/AICopilot";
+import Reports from "./components/Reports";
+import Settings from "./components/Settings";
+import Terminal from "./components/Terminal";
+import Login from "./components/Login";
+import Register from "./components/Register";
+import PageTransition from "./components/PageTransition";
+import { cn } from "./lib/utils";
+import { Shield, Loader2, ShieldAlert } from "lucide-react";
+import { useAuth } from "./hooks/useAuth";
+import { siemLogger } from "./lib/siemLogger";
 
-// INLINE STYLES / UTILS
-const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
+const ProtectedRoute = ({ children, isAuthenticated, isLoading }: { children: React.ReactNode, isAuthenticated: boolean, isLoading: boolean }) => {
+  if (isLoading) return null;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+};
 
-// EMERGENCY FALLBACK COMPONENTS
-const Sidebar = ({ onLogout }: any) => (
-  <div className="w-64 bg-bg-secondary border-r border-white/5 h-screen p-6 hidden md:flex flex-col z-50">
-    <div className="flex items-center gap-3 mb-10">
-      <div className="p-2 bg-accent-blue/10 rounded-lg border border-accent-blue/20">
-        <Shield className="w-6 h-6 text-accent-blue" />
+const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    const handleError = (error: ErrorEvent) => {
+      console.error("Aegis Component Crash:", error);
+      siemLogger.log({
+        event: 'COMPONENT_CRASH',
+        severity: 'CRITICAL',
+        source: 'ErrorBoundary',
+        details: { error: error.message }
+      });
+      setHasError(true);
+    };
+    window.addEventListener('error', handleError);
+    return () => window.removeEventListener('error', handleError);
+  }, []);
+
+  if (hasError) {
+    return (
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-bg-primary text-text-primary p-8 text-center">
+        <ShieldAlert className="w-16 h-16 text-danger mb-6 animate-pulse" />
+        <h2 className="text-2xl font-bold font-headline uppercase mb-4 tracking-tight">Security Kernel Panic</h2>
+        <p className="max-w-md text-text-secondary text-sm mb-8 leading-relaxed">
+          A critical system component has failed. The Aegis kernel has intercepted the crash.
+        </p>
+        <button onClick={() => window.location.reload()} className="btn-primary px-8 py-3">Re-Initialize</button>
       </div>
-      <h1 className="font-bold text-white tracking-tighter">AEGIS IIOT</h1>
-    </div>
-    <nav className="flex-1 space-y-2">
-      <div className="px-4 py-3 bg-accent-blue/5 text-accent-blue border border-accent-blue/10 rounded-xl text-xs font-bold uppercase tracking-widest">Dashboard</div>
-    </nav>
-    <button onClick={onLogout} className="mt-auto flex items-center gap-3 text-text-muted hover:text-white transition-colors text-xs font-bold uppercase tracking-widest">
-      <LogOut className="w-4 h-4" /> Sign Out
-    </button>
-  </div>
-);
+    );
+  }
+  return <>{children}</>;
+};
 
-const Dashboard = () => (
-  <div className="p-8 space-y-10">
-    <div className="flex justify-between items-center">
-      <h2 className="text-3xl font-bold text-white uppercase italic font-headline">Operational Overview</h2>
-      <div className="flex items-center gap-3 bg-success/10 px-4 py-2 rounded-xl border border-success/20">
-        <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
-        <span className="text-[10px] text-success font-black uppercase tracking-widest">Demo Mode: Active</span>
+const AppContent = () => {
+  const { isAuthenticated, isLoading, logout, setIsAuthenticated } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isAuthPage = location.pathname.includes("/login") || location.pathname.includes("/register");
+
+  useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [location.pathname]);
+
+  // Handle Redirection - Stable
+  useEffect(() => {
+    if (isLoading) return;
+    if (!isAuthenticated && !isAuthPage) {
+      navigate("/login", { replace: true });
+    } else if (isAuthenticated && isAuthPage) {
+      navigate("/", { replace: true });
+    }
+  }, [isAuthenticated, isLoading, isAuthPage, navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-bg-primary text-text-primary">
+        <Loader2 className="w-12 h-12 text-accent-blue animate-spin mb-6" />
+        <p className="text-xs font-bold uppercase tracking-widest text-text-muted animate-pulse">Establishing Secure Tunnel...</p>
       </div>
-    </div>
-    
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-      {[
-        { t: "TOTAL DEVICES", v: "12", c: "accent-blue", i: Cpu },
-        { t: "ACTIVE THREATS", v: "0", c: "success", i: ShieldCheck },
-        { t: "TRUST SCORE", v: "99.2", c: "success", i: Zap },
-        { t: "SYSTEM LOAD", v: "14%", c: "accent-purple", i: Activity }
-      ].map((s, i) => (
-        <div key={i} className="glass-card p-6 border-t-2" style={{ borderTopColor: `var(--color-${s.c})` }}>
-          <p className="text-[10px] text-text-muted uppercase tracking-widest mb-4">{s.t}</p>
-          <div className="flex justify-between items-end">
-            <h3 className="text-3xl font-bold text-white">{s.v}</h3>
-            <s.i className={cn("w-6 h-6", `text-${s.c}`)} />
-          </div>
-        </div>
-      ))}
-    </div>
+    );
+  }
 
-    <div className="glass-card p-12 text-center border-dashed border-white/10">
-      <ShieldAlert className="w-16 h-16 text-accent-blue mx-auto mb-6 opacity-20" />
-      <h3 className="text-xl font-bold text-white mb-2">ADVANCED PROTOCOLS LOADED</h3>
-      <p className="text-text-secondary text-sm max-w-lg mx-auto">The Aegis Security Kernel is operating in hardened Demo Mode. All systems are 100% operational for your hackathon presentation.</p>
-    </div>
-  </div>
-);
-
-export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
 
   return (
-    <Router>
-      <div className="flex min-h-screen bg-bg-primary text-text-primary font-sans selection:bg-accent-blue/30 overflow-x-hidden relative">
-        {/* BACKGROUND */}
-        <div className="fixed inset-0 pointer-events-none z-0">
-          <div className="absolute inset-0 cyber-grid opacity-10" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-accent-blue/[0.05] rounded-full blur-[160px]" />
-          <div className="scanline opacity-20" />
-        </div>
-
-        {isAuthenticated && <Sidebar onLogout={() => setIsAuthenticated(false)} />}
-        
-        <main className="flex-1 relative z-10 overflow-y-auto">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </main>
+    <div className="flex min-h-screen bg-bg-primary text-text-primary selection:bg-accent-blue/30 font-body overflow-x-hidden relative">
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute inset-0 cyber-grid cyber-grid-animate" />
+        <div className="absolute -top-48 -left-48 w-[600px] h-[600px] bg-accent-blue/[0.04] rounded-full blur-[120px] cyber-pulse" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-accent-blue/[0.025] rounded-full blur-[160px]" />
+        <div className="scanline opacity-40" />
       </div>
+
+      {!isAuthPage && isAuthenticated && (
+        <Sidebar onLogout={handleLogout} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      )}
+      <div className="flex-1 flex flex-col min-w-0 relative z-10">
+        {!isAuthPage && isAuthenticated && (
+            <Header onLogout={handleLogout} onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
+        )}
+        <main className={cn("flex-1 overflow-y-auto custom-scrollbar", !isAuthPage && isAuthenticated ? "px-4 md:px-8 pb-8" : "")}>
+          <div className={cn(!isAuthPage && isAuthenticated ? "max-w-[1400px] mx-auto w-full pt-6" : "h-full")}>
+            <AnimatePresence mode="wait">
+              <motion.div 
+                key={location.pathname}
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                className="h-full"
+              >
+                <Routes>
+                  <Route path="/login" element={<PageTransition><Login onLogin={() => setIsAuthenticated(true)} onToggleMode={() => navigate("/register")} /></PageTransition>} />
+                  <Route path="/register" element={<PageTransition><Register onRegister={() => setIsAuthenticated(true)} onToggleMode={() => navigate("/login")} /></PageTransition>} />
+                  
+                  <Route path="/" element={<ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}><PageTransition><Dashboard /></PageTransition></ProtectedRoute>} />
+                  <Route path="/devices" element={<ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}><PageTransition><DeviceManagement /></PageTransition></ProtectedRoute>} />
+                  <Route path="/network" element={<ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}><PageTransition><NetworkVisualization /></PageTransition></ProtectedRoute>} />
+                  <Route path="/threats" element={<ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}><PageTransition><ThreatCenter /></PageTransition></ProtectedRoute>} />
+                  <Route path="/simulation" element={<ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}><PageTransition><AttackSimulation /></PageTransition></ProtectedRoute>} />
+                  <Route path="/zero-trust" element={<ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}><PageTransition><ZeroTrust /></PageTransition></ProtectedRoute>} />
+                  <Route path="/reports" element={<ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}><PageTransition><Reports /></PageTransition></ProtectedRoute>} />
+                  <Route path="/settings" element={<ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}><PageTransition><Settings /></PageTransition></ProtectedRoute>} />
+                  <Route path="/terminal" element={<ProtectedRoute isAuthenticated={isAuthenticated} isLoading={isLoading}><PageTransition><Terminal /></PageTransition></ProtectedRoute>} />
+
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </main>
+        {!isAuthPage && isAuthenticated && <AICopilot />}
+      </div>
+    </div>
+  );
+};
+
+export default function App() {
+  return (
+    <Router>
+      <ErrorBoundary>
+        <AppContent />
+      </ErrorBoundary>
     </Router>
   );
 }
