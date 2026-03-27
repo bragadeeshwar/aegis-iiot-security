@@ -94,8 +94,8 @@ const StatCard = ({ title, value, icon: Icon, trend, trendValue, color, isIsolat
 export default function Dashboard() {
   const navigate = useNavigate();
   const [chartData, setChartData] = useState(initialChartData);
-  const [liveDevices, setLiveDevices] = useState<any[]>([]);
-  const [liveThreats, setLiveThreats] = useState<any[]>([]);
+  const [liveDevices, setLiveDevices] = useState<any[]>(initialDevices);
+  const [liveThreats, setLiveThreats] = useState<any[]>(initialThreats);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [systemLoad, setSystemLoad] = useState(24);
   const [trustScore, setTrustScore] = useState(94.2);
@@ -108,15 +108,29 @@ export default function Dashboard() {
     motor_status: "stopped"
   });
 
-  const isKeyPlaceholder = import.meta.env.VITE_SUPABASE_ANON_KEY?.includes("YOUR_CLOUD");
-
+  // Step 1: Cloud Connection Check
   useEffect(() => {
-    // UI Motion for dashboard demo effect
+    const checkCloudConnection = async () => {
+      if (!isSupabaseConfigured) {
+        setIsCloudConnected(false);
+        return;
+      }
+      try {
+        const { error } = await supabase.from('iot_telemetry').select('*').limit(1);
+        setIsCloudConnected(!error);
+      } catch (e) {
+        setIsCloudConnected(false);
+      }
+    };
+    checkCloudConnection();
+  }, []);
+
+  // Step 2: Data Fetching and Subscriptions
+  useEffect(() => {
     const interval = setInterval(() => {
       setSystemLoad(prev => Math.max(10, Math.min(95, prev + (Math.random() * 10 - 5))));
       setTrustScore(prev => Math.max(80, Math.min(99.9, prev + (Math.random() * 2 - 1))));
       
-      // If not connected, animate some mock telemetry
       if (!isCloudConnected) {
         setLatestTelemetry(prev => ({
           ...prev,
@@ -127,119 +141,78 @@ export default function Dashboard() {
       }
     }, 3000);
 
-    const checkCloudConnection = async () => {
-      if (!isSupabaseConfigured) {
-        setIsCloudConnected(false);
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase.from('iot_telemetry').select('*').limit(1);
-        if (error) throw error;
-        setIsCloudConnected(true);
-      } catch (e) {
-        console.warn("Cloud connection check failed, using simulation mode.");
-        setIsCloudConnected(false);
-      }
-    };
-
-    checkCloudConnection();
-
     const fetchInitialData = async () => {
-      // Bail out early if not configured
-      if (!isSupabaseConfigured) {
-        setLiveDevices(initialDevices);
-        setLiveThreats(initialThreats);
+      if (!isCloudConnected) {
         setIsDataLoading(false);
         return;
       }
-
       try {
-        // Fetch devices
-        const { data: deviceData, error: deviceError } = await supabase
-          .from('devices')
-          .select('*');
-        if (!deviceError && deviceData) setLiveDevices(mapDevices(deviceData));
-        else setLiveDevices(initialDevices);
+        setIsDataLoading(true);
+        const [devicesRes, threatsRes, telemetryRes] = await Promise.all([
+          supabase.from('devices').select('*'),
+          supabase.from('threats').select('*').order('timestamp', { ascending: false }),
+          supabase.from('iot_telemetry').select('*').order('timestamp', { ascending: false }).limit(1)
+        ]);
 
-        // Fetch threats
-        const { data: threatData, error: threatError } = await supabase
-          .from('threats')
-          .select('*')
-          .order('timestamp', { ascending: false });
-        if (!threatError && threatData) setLiveThreats(mapThreats(threatData));
-        else setLiveThreats(initialThreats);
-
-        // Fetch telemetry
-        const { data: telemetryData, error: telemetryError } = await supabase
-          .from('iot_telemetry')
-          .select('*')
-          .order('timestamp', { ascending: false })
-          .limit(1);
-        
-        if (!telemetryError && telemetryData && telemetryData.length > 0) {
+        if (devicesRes.data) setLiveDevices(mapDevices(devicesRes.data));
+        if (threatsRes.data) setLiveThreats(mapThreats(threatsRes.data));
+        if (telemetryRes.data && telemetryRes.data[0]) {
           setLatestTelemetry({
-            temperature: telemetryData[0].temperature,
-            vibration: telemetryData[0].vibration,
-            current: telemetryData[0].current,
-            motor_status: telemetryData[0].motor_status
+            temperature: telemetryRes.data[0].temperature,
+            vibration: telemetryRes.data[0].vibration,
+            current: telemetryRes.data[0].current,
+            motor_status: telemetryRes.data[0].motor_status
           });
         }
       } catch (e) {
-        console.warn("Initial data fetch failed:", e);
-        setLiveDevices(initialDevices);
-        setLiveThreats(initialThreats);
+        console.warn("Telemetry fetch fallback active.");
       } finally {
         setIsDataLoading(false);
       }
     };
 
-    if (!isKeyPlaceholder) fetchInitialData();
-    else {
-      setLiveDevices(initialDevices);
-      setLiveThreats(initialThreats);
-      setIsDataLoading(false);
-    }
+    fetchInitialData();
 
-    // Subscribe to everything
-    const deviceSub = supabase.channel('dashboard-devices').on('postgres_changes', { event: '*', schema: 'public', table: 'devices' }, payload => {
-       if (payload.eventType === 'INSERT') setLiveDevices(prev => [...prev, mapDevice(payload.new)]);
-       else if (payload.eventType === 'UPDATE') setLiveDevices(prev => prev.map(d => String(d.id) === String(payload.new.id) ? mapDevice(payload.new) : d));
-       else if (payload.eventType === 'DELETE') setLiveDevices(prev => prev.filter(d => String(d.id) !== String(payload.old.id)));
-    }).subscribe();
+    // Only subscribe if connected
+    let deviceSub: any, threatSub: any, telemetrySub: any;
+    if (isCloudConnected) {
+      deviceSub = supabase.channel('dashboard-devices').on('postgres_changes', { event: '*', schema: 'public', table: 'devices' }, payload => {
+        if (payload.eventType === 'INSERT') setLiveDevices(prev => [...prev, mapDevice(payload.new)]);
+        else if (payload.eventType === 'UPDATE') setLiveDevices(prev => prev.map(d => String(d.id) === String(payload.new.id) ? mapDevice(payload.new) : d));
+        else if (payload.eventType === 'DELETE') setLiveDevices(prev => prev.filter(d => String(d.id) !== String(payload.old.id)));
+      }).subscribe();
 
-    const threatSub = supabase.channel('dashboard-threats').on('postgres_changes', { event: '*', schema: 'public', table: 'threats' }, payload => {
-       if (payload.eventType === 'INSERT') setLiveThreats(prev => [mapThreat(payload.new as any), ...prev]);
-       else if (payload.eventType === 'UPDATE') setLiveThreats(prev => prev.map(t => String(t.id) === String(payload.new.id) ? mapThreat(payload.new as any) : t));
-       else if (payload.eventType === 'DELETE') setLiveThreats(prev => prev.filter(t => String(t.id) !== String(payload.old.id)));
-    }).subscribe();
+      threatSub = supabase.channel('dashboard-threats').on('postgres_changes', { event: '*', schema: 'public', table: 'threats' }, payload => {
+        if (payload.eventType === 'INSERT') setLiveThreats(prev => [mapThreat(payload.new as any), ...prev]);
+        else if (payload.eventType === 'UPDATE') setLiveThreats(prev => prev.map(t => String(t.id) === String(payload.new.id) ? mapThreat(payload.new as any) : t));
+        else if (payload.eventType === 'DELETE') setLiveThreats(prev => prev.filter(t => String(t.id) !== String(payload.old.id)));
+      }).subscribe();
 
-    // Telemetry subscription
-    const telemetrySub = supabase.channel('dashboard-telemetry').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'iot_telemetry' }, payload => {
-       const newData = payload.new as any;
-       setLatestTelemetry({
+      telemetrySub = supabase.channel('dashboard-telemetry').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'iot_telemetry' }, payload => {
+        const newData = payload.new as any;
+        setLatestTelemetry({
           temperature: newData.temperature,
           vibration: newData.vibration,
           current: newData.current,
           motor_status: newData.motor_status
-       });
-       // Update traffic chart
-       setChartData(prev => {
-         const updated = [...prev.slice(1)];
-         updated.push({
-           name: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-           threats: newData.is_anomaly ? 10 : 0,
-           traffic: newData.motor_status === 'running' ? 800 : 300
-         });
-         return updated;
-       });
-    }).subscribe();
+        });
+        setChartData(prev => {
+          const updated = [...prev.slice(1)];
+          updated.push({
+            name: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+            threats: newData.is_anomaly ? 10 : 0,
+            traffic: newData.motor_status === 'running' ? 800 : 300
+          });
+          return updated;
+        });
+      }).subscribe();
+    }
 
     return () => {
       clearInterval(interval);
-      supabase.removeChannel(deviceSub);
-      supabase.removeChannel(threatSub);
-      supabase.removeChannel(telemetrySub);
+      if (deviceSub) supabase.removeChannel(deviceSub);
+      if (threatSub) supabase.removeChannel(threatSub);
+      if (telemetrySub) supabase.removeChannel(telemetrySub);
     };
   }, [isCloudConnected]);
 
@@ -416,7 +389,7 @@ export default function Dashboard() {
               >
                 <div className="flex justify-between items-start mb-1">
                   <p className="text-[12px] md:text-[13px] font-bold text-[#E6EAF2] group-hover:text-white transition-colors">{threat.name}</p>
-                  <span className="text-[8px] md:text-[9px] text-text-muted font-mono font-bold">{threat.timestamp.split(' ').pop()}</span>
+                  <span className="text-[8px] md:text-[9px] text-text-muted font-mono font-bold">{threat.timestamp?.split(' ').pop()}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <p className="text-[9px] text-text-secondary uppercase tracking-[0.1em] font-black">{threat.severity}</p>
@@ -478,8 +451,8 @@ export default function Dashboard() {
                     <React.Fragment key={i}>
                       <motion.div 
                         animate={{ 
-                          scale: [1, 1.2, 1],
-                          opacity: networkLive ? [0.4, 1, 0.4] : 0.2
+                           scale: [1, 1.2, 1],
+                           opacity: networkLive ? [0.4, 1, 0.4] : 0.2
                         }}
                         transition={{ duration: 2 + i, repeat: Infinity, delay: i * 0.5 }}
                         className={cn(
