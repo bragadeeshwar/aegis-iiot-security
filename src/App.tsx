@@ -19,7 +19,7 @@ import Register from "./components/Register";
 import PageTransition from "./components/PageTransition";
 import { cn } from "./lib/utils";
 import { supabase } from "./lib/supabaseClient";
-import { Shield, Loader2 } from "lucide-react";
+import { Shield, Loader2, ShieldAlert } from "lucide-react";
 import { useAuth } from "./hooks/useAuth";
 
 const ProtectedRoute = ({ children, isAuthenticated, isLoading }: { children: React.ReactNode, isAuthenticated: boolean, isLoading: boolean }) => {
@@ -58,7 +58,7 @@ class ErrorBoundary extends React.Component<any, any> {
     if (this.state.hasError) {
       return (
         <div className="h-screen w-full flex flex-col items-center justify-center bg-bg-primary text-text-primary p-8 text-center">
-          <shield-alert-icon className="w-16 h-16 text-danger mb-6 animate-pulse" />
+          <ShieldAlert className="w-16 h-16 text-danger mb-6 animate-pulse" />
           <h2 className="text-2xl font-bold font-headline uppercase mb-4 tracking-tight">Security Kernel Panic</h2>
           <p className="max-w-md text-text-secondary text-sm mb-8 leading-relaxed">
             A critical system component has failed. The Aegis kernel has intercepted the crash to prevent data leakage.

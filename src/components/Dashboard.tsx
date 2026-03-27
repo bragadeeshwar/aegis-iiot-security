@@ -28,7 +28,7 @@ import { motion } from "motion/react";
 import { cn } from "../lib/utils";
 import NeuralEngine from "./NeuralEngine";
 import { devices as initialDevices, threats as initialThreats } from "../mockData";
-import { supabase } from "../lib/supabaseClient";
+import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import { mapDevice, mapDevices, mapThreat, mapThreats } from "../lib/supabaseMapper";
 
 const initialChartData = [
@@ -128,7 +128,7 @@ export default function Dashboard() {
     }, 3000);
 
     const checkCloudConnection = async () => {
-      if (isKeyPlaceholder) {
+      if (!isSupabaseConfigured) {
         setIsCloudConnected(false);
         return;
       }
@@ -146,6 +146,14 @@ export default function Dashboard() {
     checkCloudConnection();
 
     const fetchInitialData = async () => {
+      // Bail out early if not configured
+      if (!isSupabaseConfigured) {
+        setLiveDevices(initialDevices);
+        setLiveThreats(initialThreats);
+        setIsDataLoading(false);
+        return;
+      }
+
       try {
         // Fetch devices
         const { data: deviceData, error: deviceError } = await supabase
