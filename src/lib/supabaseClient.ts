@@ -4,8 +4,10 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey || supabaseAnonKey.includes("YOUR_CLOUD")) {
+export const isSupabaseConfigured = !!supabaseUrl && !!supabaseAnonKey && !supabaseAnonKey.includes("YOUR_CLOUD");
+
+if (!isSupabaseConfigured) {
   console.warn("🛡️ Aegis Security Alert: Supabase URL or Anon Key is missing or invalid. Live Cloud Auth will be disabled.");
 }
 
-export const supabase = createClient(supabaseUrl || "", supabaseAnonKey || "");
+export const supabase = createClient(supabaseUrl || "https://placeholder.supabase.co", supabaseAnonKey || "placeholder");
